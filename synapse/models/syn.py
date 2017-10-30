@@ -48,6 +48,11 @@ class SynMod(CoreModule):
                     ('role', {'ptype': 'syn:auth:role'}),
                 )),
 
+                ('syn:fifo', {'ptype': 'guid', 'local': 1}, (
+                    ('name', {'ptype': 'syn:prop'}),
+                    ('role', {'ptype': 'syn:auth:role'}),
+                )),
+
                 ('syn:trigger', {'ptype': 'guid', 'local': 1}, (
                     ('en', {'ptype': 'bool', 'defval': 0, 'doc': 'Is the trigger currently enabled'}),
                     ('on', {'ptype': 'syn:perm'}),

@@ -1098,8 +1098,7 @@ class CortexTest(SynTest):
 
             self.nn(foob[1].get('tufo:list:hehe'))
 
-            vals = core.getTufoList(foob, 'hehe')
-            vals.sort()
+            vals = sorted(core.getTufoList(foob, 'hehe'))
 
             self.eq(tuple(vals), (1, 2, 3))
 
@@ -2756,6 +2755,70 @@ class CortexTest(SynTest):
             self.none(t1[1].get('strform:bar'))
             self.none(t1[1].get('strform:baz'))
             self.none(t1[1].get('strform:haha'))
+
+    def test_cortex_fifo(self):
+
+        with self.getTestDir() as dirn:
+
+            dbpath = os.path.join(dirn, 'core.db')
+
+            with s_cortex.openurl('sqlite:///%s' % (dbpath,)) as core:
+
+                core.setConfOpt('dir', dirn)
+
+                node = core.formTufoByProp('syn:fifo', '*', name='visi')
+
+                path = core.getCorePath('fifos', node[1].get('syn:fifo'))
+                self.true(os.path.isdir(path))
+
+                fifo = core.getCoreFifo('visi')
+                self.nn(fifo)
+
+                sent = []
+                core.subCoreFifo('visi', xmit=sent.append)
+
+                core.putCoreFifo('visi', 'hehe')
+                self.eq(len(sent), 1)
+
+            # check that it persists...
+            with s_cortex.openurl('sqlite:///%s' % (dbpath,)) as core:
+
+                core.setConfOpt('dir', dirn)
+
+                node = core.getTufoByProp('syn:fifo:name', 'visi')
+
+                sent = []
+                core.subCoreFifo('visi', xmit=sent.append)
+
+                self.eq(len(sent), 1)
+                self.eq(sent[0][2], 'hehe')
+
+                core.ackCoreFifo('visi', sent[0][1])
+
+                core.delTufo(node)
+                self.false(os.path.isdir(path))
+
+            # check perms...
+            with s_cortex.openurl('sqlite:///%s' % (dbpath,)) as core:
+
+                core.eval('[ syn:auth:user=visi@localhost ]')
+
+                core.setConfOpts({'dir': dirn, 'auth:en': 1})
+
+                with s_auth.runas('visi@localhost'):
+                    self.raises(AuthDeny, core.subCoreFifo, 'visi')
+                    self.raises(AuthDeny, core.ackCoreFifo, 'visi', 20)
+                    self.raises(AuthDeny, core.putCoreFifo, 'visi', 'hehe')
+
+            # check NoSuchFifo
+            with s_cortex.openurl('sqlite:///%s' % (dbpath,)) as core:
+
+                core.setConfOpts({'dir': dirn})
+                self.raises(NoSuchFifo, core.subCoreFifo, 'visi')
+                self.raises(NoSuchFifo, core.ackCoreFifo, 'visi', 20)
+                self.raises(NoSuchFifo, core.putCoreFifo, 'visi', 'hehe')
+
+    #def test_cortex_fifo_remote(self):
 
 class StorageTest(SynTest):
 

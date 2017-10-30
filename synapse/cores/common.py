@@ -1,4 +1,6 @@
+import os
 import json
+import shutil
 import logging
 import itertools
 import threading
@@ -7,11 +9,13 @@ import collections
 import synapse.common as s_common
 import synapse.dyndeps as s_dyndeps
 import synapse.reactor as s_reactor
+import synapse.eventbus as s_eventbus
 import synapse.telepath as s_telepath
 
 import synapse.cores.storage as s_storage
 
 import synapse.lib.auth as s_auth
+import synapse.lib.fifo as s_fifo
 import synapse.lib.tags as s_tags
 import synapse.lib.tufo as s_tufo
 import synapse.lib.cache as s_cache
@@ -66,6 +70,9 @@ class Cortex(EventBus, DataModel, Runtime, s_ingest.IngestApi):
         self.on('node:del', self._onDelAuthUserRole, form='syn:auth:userrole')
         self.on('node:del', self._onDelSynTag, form='syn:tag')
         self.on('node:form', self._onFormSynTag, form='syn:tag')
+
+        self.on('node:add', self._onAddFifo, form='syn:fifo')
+        self.on('node:del', self._onDelFifo, form='syn:fifo')
 
         # a cortex may have a ref to an axon
         self.axon = None
@@ -152,6 +159,9 @@ class Cortex(EventBus, DataModel, Runtime, s_ingest.IngestApi):
         self.cache_byiden = s_cache.RefDict()
         self.cache_byprop = collections.defaultdict(dict)   # (<prop>,<valu>):[ ((prop, valu, limt),  answ), ... ]
 
+        self.cache_fifos = s_eventbus.BusRef(ctor=self._openCoreFifo)
+        self.onfini(self.cache_fifos.fini)
+
         #############################################################
         # Handlers for each splice event action
         self.spliceact = s_reactor.Reactor()
@@ -237,6 +247,126 @@ class Cortex(EventBus, DataModel, Runtime, s_ingest.IngestApi):
 
         self.setBlobValu('syn:core:synapse:version', s_version.version)
 
+    def getCorePath(self, *paths):
+        '''
+        Build a relative path from the cortex metadata directory.
+
+        Args:
+            *paths ((str,...)): Path elements to join
+
+        Returns:
+            (str):  The full path ( or None if config dir not set ).
+
+        '''
+        dirn = self.getConfOpt('dir')
+        if dirn is None:
+            return None
+        return s_common.genpath(dirn, *paths)
+
+    def getCoreFifo(self, name):
+        '''
+        Return a Fifo configured by the cortex.
+
+        The node syn:fifo with :name=name must exist.
+        '''
+        return self.cache_fifos.gen(name)
+
+    def _openCoreFifo(self, name):
+
+        node = self.getTufoByProp('syn:fifo:name', name)
+        if node is None:
+            raise s_common.NoSuchFifo(name=name)
+
+        iden = node[1].get('syn:fifo')
+        path = self.getCorePath('fifos', iden)
+        if path is None:
+            raise ReqConfOpt(name='dir', mesg='cortex fifo requires dir opt')
+
+        conf = {'fifo:dir': path}
+        return s_fifo.Fifo(conf)
+
+    def _onAddFifo(self, mesg):
+        node = mesg[1].get('node')
+        iden = node[1].get('syn:fifo')
+
+        path = self.getCorePath('fifos', iden)
+        if path is not None:
+            os.makedirs(path, exist_ok=True)
+
+    def _onDelFifo(self, mesg):
+        node = mesg[1].get('node')
+        iden = node[1].get('syn:fifo')
+
+        path = self.getCorePath('fifos', iden)
+        if path is not None:
+            shutil.rmtree(path, ignore_errors=True)
+
+    def ackCoreFifo(self, name, nseq):
+        '''
+        Acknowledge a fifo message.
+
+        Args:
+            name (str): The syn:fifo:name of the fifo.
+            nseq (int): The next expected sequence number.
+        '''
+        perm = ('fifo:sub', {'name': name})
+        if not self.allowed(perm):
+            raise s_common.AuthDeny(perm=perm)
+
+        fifo = self.cache_fifos.gen(name)
+        if fifo is None:
+            raise NoSuchFifo(name=name)
+
+        return fifo.ack(nseq)
+
+    def subCoreFifo(self, name, xmit=None):
+        '''
+        Subscribe to a given core fifo.
+
+        Args:
+            name (str): The syn:fifo:name of the fifo.
+            xmit (func): A transmit function (telepath sock.tx if None)
+        '''
+        perm = ('fifo:sub', {'name': name})
+        if not self.allowed(perm):
+            raise s_common.AuthDeny(perm=perm)
+
+        fifo = self.cache_fifos.gen(name)
+        if fifo is None:
+            raise NoSuchFifo(name=name)
+
+        # if xmit is none, assume they are a remote
+        # (telepath) caller and tie it to sock tx.
+        if xmit is None:
+
+            sock = s_scope.get('sock')
+            if sock is None:
+                raise SynErr(mesg='subCoreFifo without xmit or sock')
+
+            def xmit(qent):
+                mesg = ('fifo:xmit', {'name': name, 'qent': qent})
+                sock.tx(mesg)
+
+        fifo.resync(xmit=xmit)
+
+    def putCoreFifo(self, name, item):
+        '''
+        Add an object to the given core fifo.
+
+        Args:
+            name (str): The syn:fifo:name of the fifo.
+            item (obj): The object to add to the fifo.
+        '''
+        perm = ('fifo:put', {'name': name})
+        if not self.allowed(perm):
+            raise s_common.AuthDeny(perm=perm)
+
+        fifo = self.cache_fifos.gen(name)
+        if fifo is None:
+            raise NoSuchFifo(name=name)
+
+        fifo.put(item)
+
     def addRuntNode(self, form, valu, props=None):
         '''
         Add a "runtime" node which does not persist.
@@ -296,6 +426,8 @@ class Cortex(EventBus, DataModel, Runtime, s_ingest.IngestApi):
     def _cortex_condefs():
         confdefs = (
 
+            ('dir', {'type': 'str', 'doc': 'A directory for cortex metadata'}),
+
             ('autoadd', {'type': 'bool', 'asloc': 'autoadd', 'defval': 1,
                          'doc': 'Automatically add forms for props where type is form'}),
 
@@ -305,17 +437,23 @@ class Cortex(EventBus, DataModel, Runtime, s_ingest.IngestApi):
             ('auth:url', {'type': 'inet:url', 'doc': 'Optional remote auth cortex (restart required)'}),
 
             ('enforce', {'type': 'bool', 'asloc': 'enforce', 'defval': 1, 'doc': 'Enables data model enforcement'}),
+
             ('caching', {'type': 'bool', 'asloc': 'caching', 'defval': 0,
                          'doc': 'Enables caching layer in the cortex'}),
+
             ('cache:maxsize', {'type': 'int', 'asloc': 'cache_maxsize', 'defval': 1000,
                                'doc': 'Enables caching layer in the cortex'}),
+
             ('rev:model', {'type': 'bool', 'defval': 1, 'doc': 'Set to 0 to disallow model version updates'}),
             ('rev:storage', {'type': 'bool', 'defval': 1, 'doc': 'Set to 0 to disallow storage version updates'}),
             ('axon:url', {'type': 'str', 'doc': 'Allows cortex to be aware of an axon blob store'}),
-            ('axon:dirmode', {'type': 'int', 'doc': 'Default mode used to make axon:path nodes for directories.',
-                              'defval': 0o775}),
+
+            ('axon:dirmode', {'type': 'int', 'defval': 0o775,
+                'doc': 'Default mode used to make axon:path nodes for directories.'}),
+
             ('log:save', {'type': 'bool', 'asloc': 'logsave', 'defval': 0,
                           'doc': 'Enables saving exceptions to the cortex as syn:log nodes'}),
+
             ('log:level', {'type': 'int', 'asloc': 'loglevel', 'defval': 0, 'doc': 'Filters log events to >= level'}),
             ('modules', {'defval': (), 'doc': 'An optional list of (pypath,conf) tuples for synapse modules to load'})
         )
