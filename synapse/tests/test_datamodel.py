@@ -383,3 +383,9 @@ class DataModelTest(SynTest):
             v, _ = core.reqPropNorm('strform:foo', '1')
             self.eq(v, '1')
             self.raises(NoSuchProp, core.reqPropNorm, 'strform:beepbeep', '1')
+
+    def test_datamodel_propsubtype(self):
+
+        with self.getRamCore() as core:
+            self.true(core.isPropSubType('it:host', 'guid'))
+            self.false(core.isPropSubType('foo:bar', 'baz:faz'))

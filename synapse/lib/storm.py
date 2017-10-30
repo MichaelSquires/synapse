@@ -1031,6 +1031,8 @@ class Runtime(Configable):
             srcp = args[0]
             dstp = args[1]
 
+        # is our dst a propvalu / xref?
+
         # do we have a relative source property?
         relsrc = srcp is not None and srcp.startswith(':')
 
@@ -1041,24 +1043,30 @@ class Runtime(Configable):
 
             for tufo in tufs:
                 valu = tufo[1].get(srcp)
-                if valu is not None:
-                    vals.add(valu)
+                if valu is None:
+                    continue
+
+                vals.add(valu)
 
         elif not relsrc:
 
             for tufo in tufs:
                 form = tufo[1].get('tufo:form')
                 valu = tufo[1].get(form)
-                if valu is not None:
-                    vals.add(valu)
+                if valu is None:
+                    continue
+
+                vals.add(valu)
 
         else:
 
             for tufo in tufs:
                 form = tufo[1].get('tufo:form')
                 valu = tufo[1].get(form + srcp)
-                if valu is not None:
-                    vals.add(valu)
+                if valu is None:
+                    continue
+
+                vals.add(valu)
 
         [query.add(t)for t in self.stormTufosBy('in', dstp, list(vals), limit=opts.get('limit'))]
 

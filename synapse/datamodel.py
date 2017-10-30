@@ -377,6 +377,22 @@ class DataModel(s_types.TypeLib):
 
         return pdef[1].get('ptype')
 
+    def isPropSubType(self, prop, name):
+        '''
+        Test if the given property name is a subtype of name.
+
+        Args:
+            prop (str): The property name
+            name (str): The type name
+
+        Returns:
+            (bool): True if prop is of a subtype of name.
+        '''
+        tnam = self.getPropTypeName(prop)
+        if tnam is None:
+            return False
+        return self.isSubType(tnam, name)
+
     def getTypeOfs(self, name):
         '''
         Return a list of type inheritence (including specified name).
