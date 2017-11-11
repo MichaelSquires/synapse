@@ -185,5 +185,8 @@ def main(argv, outp=None):
 
     dmon.main()
 
+def entrypoint():
+    return main(sys.argv[1:])
+
 if __name__ == '__main__':
     sys.exit(main(sys.argv[1:]))

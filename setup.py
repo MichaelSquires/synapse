@@ -25,6 +25,21 @@ setup(
         'regex>=2017.9.23'
     ],
 
+    entry_points={
+        'console_scripts': [
+            'autodoc = synapse.tools.autodoc:entrypoint',
+            'cmdr = synapse.tools.cmdr:entrypoint',
+            'dmon = synapse.tools.dmon:entrypoint',
+            'dumprows = synapse.tools.dumprows:entrypoint',
+            'easycert = synapse.tools.easycert:entrypoint',
+            'ingest = synapse.tools.ingest:entrypoint',
+            'json2mpk = synapse.tools.json2mpk:entrypoint',
+            'loadrows = synapse.tools.loadrows:entrypoint',
+            'pushfile = synapse.tools.pushfile:entrypoint',
+            'superhash = synapse.tools.superhash:entrypoint',
+        ],
+    },
+
     classifiers=[
         'Development Status :: 4 - Beta',
 

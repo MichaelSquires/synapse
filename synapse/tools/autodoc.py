@@ -347,5 +347,8 @@ def main(argv, outp=None):
             fd.close()
         return 0
 
+def entrypoint():
+    return main(sys.argv[1:])
+
 if __name__ == '__main__':
     sys.exit(main(sys.argv[1:]))

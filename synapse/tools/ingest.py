@@ -159,5 +159,8 @@ def main(argv, outp=None):
 
     return 0
 
+def entrypoint():
+    return main(sys.argv[1:])
+
 if __name__ == '__main__':  # pragma: no cover
     sys.exit(main(sys.argv[1:]))

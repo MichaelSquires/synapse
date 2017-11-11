@@ -43,5 +43,8 @@ def main(argv, outp=None):
         if opts.rm:
             os.unlink(path)
 
+def entrypoint():
+    return main(sys.argv[1:])
+
 if __name__ == '__main__': # pragma: no cover
     sys.exit(main(sys.argv[1:]))

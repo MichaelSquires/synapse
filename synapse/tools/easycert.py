@@ -78,5 +78,8 @@ def main(argv, outp=None):
         outp.printf('file exists: %s' % (e.errinfo.get('path'),))
         return -1
 
+def entrypoint():
+    return main(sys.argv[1:])
+
 if __name__ == '__main__':  # pragma: no cover
     sys.exit(main(sys.argv[1:]))

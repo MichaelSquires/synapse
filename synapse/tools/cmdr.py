@@ -1,3 +1,4 @@
+import sys
 import synapse.telepath as s_telepath
 
 import synapse.lib.cmdr as s_cmdr
@@ -14,6 +15,8 @@ def main(argv):
 
     cmdr.runCmdLoop()
 
+def entrypoint():
+    return main(sys.argv[1:])
+
 if __name__ == '__main__':  # pragma: no cover
-    import sys
     sys.exit(main(sys.argv))

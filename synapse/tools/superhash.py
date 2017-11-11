@@ -80,5 +80,8 @@ def _main():  # pragma: no cover
                         format='%(asctime)s [%(levelname)s] %(message)s [%(filename)s:%(funcName)s]')
     main(sys.argv[1:])
 
+def entrypoint():
+    return main(sys.argv[1:])
+
 if __name__ == '__main__':  # pragma: no cover
     _main()

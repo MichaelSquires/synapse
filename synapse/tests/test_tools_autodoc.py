@@ -1,3 +1,4 @@
+import subprocess
 from synapse.tests.common import *
 
 import synapse.tools.autodoc as s_autodoc
