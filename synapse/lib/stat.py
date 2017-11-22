@@ -58,12 +58,21 @@ class Histogram(collections.OrderedDict):
             self._setValueInBin(binid, value)
 
     def _getValueForItem(self, item):
+        '''
+        Data aware method to get value from item
+        '''
         return item
 
     def _computeBinForValue(self, value):
+        '''
+        Data aware method to get the bin id for a value
+        '''
         return nearest(value, self._width)
 
     def _setValueInBin(self, binid, value):
+        '''
+        Data aware method to set the value in the bin
+        '''
         self[binid].append(value)
 
 class BinaryHistogram(Histogram):
@@ -153,7 +162,7 @@ class YearByDay(SynapseHistogram):
         if yday > 59 and not calendar.isleap(timestruc.tm_year):
             yday += 1
 
-        return julian
+        return yday
 
 class Linear(SynapseHistogram):
     '''
